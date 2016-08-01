@@ -5,6 +5,7 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <sys/stat.h>
+#include <limits.h>
 #include <errno.h>
 #include <stdlib.h>
 #include <assert.h>
@@ -50,25 +51,26 @@ struct riscv_stat
 syscall_t::syscall_t(htif_t* htif)
   : htif(htif), memif(&htif->memif()), table(2048)
 {
-  table[93] = &syscall_t::sys_exit;
-  table[63] = &syscall_t::sys_read;
-  table[64] = &syscall_t::sys_write;
+  table[17] = &syscall_t::sys_getcwd;
+  table[25] = &syscall_t::sys_fcntl;
+  table[34] = &syscall_t::sys_mkdirat;
+  table[35] = &syscall_t::sys_unlinkat;
+  table[37] = &syscall_t::sys_linkat;
+  table[38] = &syscall_t::sys_renameat;
+  table[46] = &syscall_t::sys_ftruncate;
+  table[48] = &syscall_t::sys_faccessat;
+  table[49] = &syscall_t::sys_chdir;
   table[56] = &syscall_t::sys_openat;
   table[57] = &syscall_t::sys_close;
-  table[80] = &syscall_t::sys_fstat;
   table[62] = &syscall_t::sys_lseek;
-  table[1039] = &syscall_t::sys_lstat;
-  table[79] = &syscall_t::sys_fstatat;
-  table[48] = &syscall_t::sys_faccessat;
-  table[25] = &syscall_t::sys_fcntl;
-  table[46] = &syscall_t::sys_ftruncate;
-  table[38] = &syscall_t::sys_renameat;
-  table[37] = &syscall_t::sys_linkat;
-  table[35] = &syscall_t::sys_unlinkat;
-  table[34] = &syscall_t::sys_mkdirat;
-  table[17] = &syscall_t::sys_getcwd;
+  table[63] = &syscall_t::sys_read;
+  table[64] = &syscall_t::sys_write;
   table[67] = &syscall_t::sys_pread;
   table[68] = &syscall_t::sys_pwrite;
+  table[79] = &syscall_t::sys_fstatat;
+  table[80] = &syscall_t::sys_fstat;
+  table[93] = &syscall_t::sys_exit;
+  table[1039] = &syscall_t::sys_lstat;
   table[2011] = &syscall_t::sys_getmainvars;
 
   register_command(0, std::bind(&syscall_t::handle_syscall, this, _1), "syscall");
@@ -84,18 +86,18 @@ syscall_t::syscall_t(htif_t* htif)
 
 std::string syscall_t::do_chroot(const char* fn)
 {
-  if (!htif->chroot.empty() && *fn == '/')
-    return htif->chroot + fn;
+  if (!chroot.empty() && *fn == '/')
+    return chroot + fn;
   return fn;
 }
 
 std::string syscall_t::undo_chroot(const char* fn)
 {
-  if (htif->chroot.empty())
+  if (chroot.empty())
     return fn;
-  if (strncmp(fn, htif->chroot.c_str(), htif->chroot.size()) == 0
-      && (htif->chroot.back() == '/' || fn[htif->chroot.size()] == '/'))
-    return fn + htif->chroot.size() - (htif->chroot.back() == '/');
+  if (strncmp(fn, chroot.c_str(), chroot.size()) == 0
+      && (chroot.back() == '/' || fn[chroot.size()] == '/'))
+    return fn + chroot.size() - (chroot.back() == '/');
   return "/";
 }
 
@@ -106,6 +108,7 @@ void syscall_t::handle_syscall(command_t cmd)
     htif->exitcode = cmd.payload();
     if (htif->exit_code())
       std::cerr << "*** FAILED *** (tohost = " << htif->exit_code() << ")" << std::endl;
+    return;
   }
   else // proxied system call
     dispatch(cmd.payload());
@@ -319,6 +322,21 @@ reg_t syscall_t::sys_getmainvars(reg_t pbuf, reg_t limit, reg_t a2, reg_t a3, re
   return 0;
 }
 
+reg_t syscall_t::sys_chdir(reg_t path, reg_t a1, reg_t a2, reg_t a3, reg_t a4, reg_t a5, reg_t a6)
+{
+  size_t size = 0;
+  while (memif->read_uint8(path + size++))
+    ;
+  std::vector<char> buf(size);
+  for (size_t offset = 0;; offset++)
+  {
+    buf[offset] = memif->read_uint8(path + offset);
+    if (!buf[offset])
+      break;
+  }
+  return sysret_errno(chdir(buf.data()));
+}
+
 void syscall_t::dispatch(reg_t mm)
 {
   reg_t magicmem[8];
@@ -357,4 +375,20 @@ int fds_t::lookup(reg_t fd)
   if (int(fd) == RISCV_AT_FDCWD)
     return AT_FDCWD;
   return fd >= fds.size() ? -1 : fds[fd];
+}
+
+void syscall_t::set_chroot(const char* where)
+{
+  char buf1[PATH_MAX], buf2[PATH_MAX];
+
+  if (getcwd(buf1, sizeof(buf1)) == NULL
+      || chdir(where) != 0
+      || getcwd(buf2, sizeof(buf2)) == NULL
+      || chdir(buf1) != 0)
+  {
+    fprintf(stderr, "could not chroot to %s\n", chroot.c_str());
+    exit(-1);
+  }
+
+  chroot = buf2;
 }

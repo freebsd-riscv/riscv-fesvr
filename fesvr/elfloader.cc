@@ -1,12 +1,14 @@
 // See LICENSE for license details.
 
+#include "elf.h"
+#include "memif.h"
+#include <cstring>
+#include <string>
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <sys/mman.h>
 #include <assert.h>
 #include <unistd.h>
-#include "elf.h"
-#include "memif.h"
 #include <stdlib.h>
 #include <stdio.h>
 #include <vector>
@@ -17,7 +19,8 @@ std::map<std::string, uint64_t> load_elf(const char* fn, memif_t* memif)
   int fd = open(fn, O_RDONLY);
   struct stat s;
   assert(fd != -1);
-  assert(fstat(fd, &s) != -1);
+  if (fstat(fd, &s) < 0)
+    abort();
   size_t size = s.st_size;
 
   char* buf = (char*)mmap(NULL, size, PROT_READ, MAP_PRIVATE, fd, 0);
