@@ -1,4 +1,5 @@
 #include "dtm.h"
+#include "encoding.h"
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -199,7 +200,7 @@ size_t dtm_t::chunk_max_size()
 uint32_t dtm_t::get_xlen()
 {
   const uint32_t prog[] = {
-    CSRRx(SET, S0, 0xF10, X0),
+    CSRRx(SET, S0, CSR_MISA, X0),
     ADDI(S1, X0, 62),
     SRL(S0, S0, S1),
     STORE(32, S0, X0, ram_base()),
@@ -267,6 +268,7 @@ void dtm_t::start_host_thread()
 
   target = context_t::current();
   host.init(host_thread_main, this);
+  host.switch_to();
 }
 
 dtm_t::dtm_t(const std::vector<std::string>& args)
@@ -300,4 +302,9 @@ void dtm_t::tick(
     resp_buf = resp_bits;
     host.switch_to();
   }
+}
+
+void dtm_t::return_resp(resp resp_bits){
+  resp_buf = resp_bits;
+  host.switch_to();
 }
