@@ -1,6 +1,6 @@
 #include "tsi.h"
-#include "configstring.h"
-#include <stdlib.h>
+#include <cstdio>
+#include <cstdlib>
 
 #define NHARTS_MAX 16
 
