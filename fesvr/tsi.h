@@ -35,6 +35,7 @@ class tsi_t : public htif_t
   void reset() override;
   void read_chunk(addr_t taddr, size_t nbytes, void* dst) override;
   void write_chunk(addr_t taddr, size_t nbytes, const void* src) override;
+  void switch_to_target();
 
   size_t chunk_align() { return 4; }
   size_t chunk_max_size() { return 1024; }
@@ -48,7 +49,7 @@ class tsi_t : public htif_t
   std::deque<uint32_t> out_data;
 
   void push_addr(addr_t addr);
-  void push_len(size_t len);
+  void push_len(addr_t len);
 
   static void host_thread(void *tsi);
 };

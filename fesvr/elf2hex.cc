@@ -7,10 +7,20 @@
 
 int main(int argc, char** argv)
 {
-  if(argc != 4)
+  if(argc < 4 || argc > 5)
   {
-    std::cerr << "Usage: " << argv[0] << " <width> <depth> <elf_file>" << std::endl;
+    std::cerr << "Usage: " << argv[0] << " <width> <depth> <elf_file> [base]" << std::endl;
     return 1;
+  }
+
+  unsigned long long int base = 0;
+  if(argc==5) {
+    base = atoll(argv[4]);
+    if((base & (base-1)))
+    {
+      std::cerr << "base must be a power of 2" << std::endl;
+      return 1;
+    }
   }
 
   unsigned width = atoi(argv[1]);
@@ -27,9 +37,10 @@ int main(int argc, char** argv)
     return 1;
   }
 
-  htif_hexwriter_t htif(width, depth);
+  htif_hexwriter_t htif(base, width, depth);
   memif_t memif(&htif);
-  load_elf(argv[3], &memif);
+  reg_t entry;
+  load_elf(argv[3], &memif, &entry);
   std::cout << htif;
 
   return 0;
