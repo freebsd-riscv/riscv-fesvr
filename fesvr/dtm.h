@@ -55,6 +55,15 @@ class dtm_t : public htif_t
 
   void producer_thread();
 
+ protected:
+  virtual void read_chunk(addr_t taddr, size_t len, void* dst) override;
+  virtual void write_chunk(addr_t taddr, size_t len, const void* src) override;
+  virtual void clear_chunk(addr_t taddr, size_t len) override;
+  virtual size_t chunk_align() override;
+  virtual size_t chunk_max_size() override;
+  virtual void reset() override;
+  virtual void idle() override;
+
  private:
   context_t host;
   context_t* target;
@@ -65,6 +74,7 @@ class dtm_t : public htif_t
   sem_t resp_consume;
   req req_buf;
   resp resp_buf;
+  bool running;
 
   uint32_t run_abstract_command(uint32_t command, const uint32_t program[], size_t program_n,
                                 uint32_t data[], size_t data_n);
@@ -78,14 +88,6 @@ class dtm_t : public htif_t
   void restore_reg(unsigned regno, uint64_t val);
   
   uint64_t modify_csr(unsigned which, uint64_t data, uint32_t type);
-
-  void read_chunk(addr_t taddr, size_t len, void* dst) override;
-  void write_chunk(addr_t taddr, size_t len, const void* src) override;
-  void clear_chunk(addr_t taddr, size_t len) override;
-  size_t chunk_align() override;
-  size_t chunk_max_size() override;
-  void reset() override;
-  void idle() override;
 
   bool req_wait;
   bool resp_wait;
